@@ -1,0 +1,260 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tower Stacking Game</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #eef6ff;
+      margin: 0;
+      padding: 20px;
+    }
+
+    h1 {
+      color: #20304a;
+    }
+
+    .score {
+      font-size: 20px;
+      margin: 15px;
+    }
+
+    canvas {
+      display: block;
+      margin: 20px auto;
+      max-width: 100%;
+      background: white;
+      border: 2px solid #cbd5e1;
+      border-radius: 8px;
+      touch-action: manipulation;
+    }
+
+    button {
+      padding: 12px 24px;
+      margin: 5px;
+      border: none;
+      border-radius: 8px;
+      background: #3478f6;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #245dcc;
+    }
+
+    #message {
+      font-weight: bold;
+      color: #20304a;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>🏗️ Tower Stacking Game</h1>
+
+  <div class="score">
+    Height: <span id="score">0</span>
+    &nbsp; | &nbsp;
+    Best: <span id="best">0</span>
+  </div>
+
+  <canvas id="game" width="360" height="500"></canvas>
+
+  <button id="drop">Drop Block</button>
+  <button id="restart">Restart</button>
+
+  <p id="message">
+    Press Space or click Drop Block!
+  </p>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+
+    const scoreText = document.getElementById("score");
+    const bestText = document.getElementById("best");
+    const message = document.getElementById("message");
+
+    const WIDTH = canvas.width;
+    const HEIGHT = canvas.height;
+    const BLOCK_HEIGHT = 20;
+    const SPEED = 2;
+
+    const colors = [
+      "#3478f6", "#22a06b", "#f5c542",
+      "#ff983f", "#9864db", "#f05252",
+      "#35bdb5"
+    ];
+
+    let stack;
+    let current;
+    let score;
+    let best = 0;
+    let direction;
+    let gameOver;
+    let animationId;
+
+    try {
+      best = Number(localStorage.getItem("towerBest")) || 0;
+    } catch (e) {
+      best = 0;
+    }
+
+    bestText.textContent = best;
+
+    function startGame() {
+      cancelAnimationFrame(animationId);
+
+      stack = [{
+        x: 80,
+        y: HEIGHT - BLOCK_HEIGHT,
+        width: 200,
+        color: colors[0]
+      }];
+
+      score = 0;
+      direction = 1;
+      gameOver = false;
+
+      scoreText.textContent = score;
+      message.textContent = "Press Space or click Drop Block!";
+      createBlock();
+      draw();
+      animate();
+    }
+
+    function createBlock() {
+      const previous = stack[stack.length - 1];
+
+      current = {
+        x: 0,
+        y: previous.y - BLOCK_HEIGHT,
+        width: previous.width,
+        color: colors[(score + 1) % colors.length]
+      };
+
+      if (current.y < 100) {
+        // Move the visible tower down as it grows.
+        stack.forEach(block => block.y += BLOCK_HEIGHT);
+        current.y += BLOCK_HEIGHT;
+      }
+    }
+
+    function drawBlock(block) {
+      ctx.fillStyle = block.color;
+      ctx.fillRect(
+        block.x, block.y, block.width, BLOCK_HEIGHT
+      );
+
+      ctx.strokeStyle = "rgba(0,0,0,0.12)";
+      ctx.strokeRect(
+        block.x, block.y, block.width, BLOCK_HEIGHT
+      );
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, WIDTH, HEIGHT);
+
+      // Draw the background.
+      ctx.fillStyle = "#f8fbff";
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+      // Draw every block in the tower.
+      stack.forEach(drawBlock);
+
+      if (!gameOver && current) {
+        drawBlock(current);
+      }
+    }
+
+    function animate() {
+      if (gameOver) return;
+
+      current.x += SPEED * direction;
+
+      if (current.x + current.width >= WIDTH) {
+        current.x = WIDTH - current.width;
+        direction = -1;
+      }
+
+      if (current.x <= 0) {
+        current.x = 0;
+        direction = 1;
+      }
+
+      draw();
+      animationId = requestAnimationFrame(animate);
+    }
+
+    function dropBlock() {
+      if (gameOver) return;
+
+      const previous = stack[stack.length - 1];
+
+      const left = Math.max(current.x, previous.x);
+      const right = Math.min(
+        current.x + current.width,
+        previous.x + previous.width
+      );
+
+      const overlap = right - left;
+
+      if (overlap <= 0) {
+        gameOver = true;
+        message.textContent =
+          "Game Over! Your tower reached " + score + " blocks.";
+        draw();
+        return;
+      }
+
+      // Keep only the part that overlaps.
+      current.x = left;
+      current.width = overlap;
+      stack.push(current);
+
+      score++;
+      scoreText.textContent = score;
+
+      if (score > best) {
+        best = score;
+        bestText.textContent = best;
+
+        try {
+          localStorage.setItem("towerBest", best);
+        } catch (e) {
+          // The game still works if storage is unavailable.
+        }
+      }
+
+      createBlock();
+      draw();
+    }
+
+    document.getElementById("drop").addEventListener(
+      "click", dropBlock
+    );
+
+    document.getElementById("restart").addEventListener(
+      "click", startGame
+    );
+
+    document.addEventListener("keydown", event => {
+      if (event.code === "Space" && !event.repeat) {
+        event.preventDefault();
+        dropBlock();
+      }
+    });
+
+    canvas.addEventListener("click", dropBlock);
+
+    startGame();
+  </script>
+</body>
+</html>
